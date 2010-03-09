@@ -368,6 +368,7 @@ struct module_command
 struct module_alias
 {
 	struct module_alias *next;
+	char *aliasname;
 	char *module;
 };
 
@@ -432,14 +433,32 @@ add_command(const char *modname,
 
 /* Link in a new alias line from the config file. */
 static struct module_alias *
-add_alias(const char *modname, struct module_alias *aliases)
+add_alias(const char *aliasname, const char *modname, struct module_alias *aliases)
 {
 	struct module_alias *new;
 
 	new = NOFAIL(malloc(sizeof(*new)));
+	new->aliasname = NOFAIL(strdup(aliasname));
 	new->module = NOFAIL(strdup(modname));
 	new->next = aliases;
 	return new;
+}
+
+
+/* Return a list of matching aliases */
+static struct module_alias *
+find_aliases(const struct module_alias *aliases,
+	     const char *name)
+{
+	struct module_alias *result = NULL;
+	while (aliases) {
+		char *aliasname = aliases->aliasname;
+		char *modname = aliases->module;
+		if (fnmatch(aliasname, name, 0) == 0)
+			result = add_alias(aliasname, modname, result);
+		aliases = aliases->next;
+	}
+	return result;
 }
 
 static void free_aliases(struct module_alias *alias_list)
@@ -450,6 +469,7 @@ static void free_aliases(struct module_alias *alias_list)
 		alias = alias_list;
 		alias_list = alias_list->next;
 
+		free(alias->aliasname);
 		free(alias->module);
 		free(alias);
 	}
@@ -468,7 +488,7 @@ add_blacklist(const char *modname, struct module_blacklist *blacklist)
 }
 
 /* Find blacklist commands if any. */
-static  int
+static int
 find_blacklist(const char *modname, const struct module_blacklist *blacklist)
 {
 	while (blacklist) {
@@ -479,19 +499,21 @@ find_blacklist(const char *modname, const struct module_blacklist *blacklist)
 	return 0;
 }
 
-/* return a new alias list, with backlisted elems filtered out */
-static struct module_alias *
-apply_blacklist(const struct module_alias *aliases,
+/* delete backlisted elems from a list of aliases */
+static void
+apply_blacklist(struct module_alias **aliases,
 		const struct module_blacklist *blacklist)
 {
 	struct module_alias *result = NULL;
-	while (aliases) {
-		char *modname = aliases->module;
+	struct module_alias *alias = *aliases;
+	while (alias) {
+		char *modname = alias->module;
 		if (!find_blacklist(modname, blacklist))
-			result = add_alias(modname, result);
-		aliases = aliases->next;
+			result = add_alias(alias->aliasname, modname, result);
+		alias = alias->next;
 	}
-	return result;
+	free_aliases(*aliases);
+	*aliases = result;
 }
 
 /* Find install commands if any. */
@@ -809,13 +831,11 @@ static char *strsep_skipspace(char **string, char *delim)
 }
 
 static int parse_config_scan(const char *filename,
-			     const char *name,
 			     struct modprobe_conf *conf,
 			     int dump_only,
 			     int removing);
 
 static int parse_config_file(const char *filename,
-			    const char *name,
 			    struct modprobe_conf *conf,
 			    int dump_only,
 			    int removing)
@@ -851,8 +871,9 @@ static int parse_config_file(const char *filename,
 			char *realname = strsep_skipspace(&ptr, "\t ");
 			if (!wildcard || !realname)
 				goto syntax_error;
-			if (fnmatch(underscores(wildcard),name,0) == 0)
-				*aliases = add_alias(underscores(realname), *aliases);
+			*aliases = add_alias(underscores(wildcard),
+					     underscores(realname),
+					     *aliases);
 		} else if (streq(cmd, "include")) {
 			struct modprobe_conf newconf = *conf;
 			newconf.aliases = NULL;
@@ -867,7 +888,7 @@ static int parse_config_file(const char *filename,
 				warn("\"include /etc/modprobe.d\" is "
 				     "the default, ignored\n");
 			} else {
-				if (!parse_config_scan(newfilename, name,
+				if (!parse_config_scan(newfilename,
 						       &newconf, dump_only,
 						       removing))
 					warn("Failed to open included"
@@ -1001,7 +1022,7 @@ static int read_aliases_file(const char *filename,
 
 	realnames = index_searchwild(index, name);
 	for (realname = realnames; realname; realname = realname->next)
-		*aliases = add_alias(realname->value, *aliases);
+		*aliases = add_alias("*", realname->value, *aliases);
 	index_values_free(realnames);
 
 	free(binfile);
@@ -1015,20 +1036,52 @@ static int read_aliases(const char *filename,
 			int dump_only,
 			struct module_alias **aliases)
 {
-	struct modprobe_conf conf = { .aliases = *aliases };
-	int ret;
+	char *line;
+	unsigned int linenum = 0;
+	FILE *cfile;
 
 	if (use_binary_indexes)
 		if (read_aliases_file(filename, name, dump_only, aliases))
 			return 1;
 
-	ret = parse_config_file(filename, name, &conf, dump_only, 0);
-	*aliases = conf.aliases;
-	return ret;
+	cfile = fopen(filename, "r");
+	if (!cfile)
+		return 0;
+
+	while ((line = getline_wrapped(cfile, &linenum)) != NULL) {
+		char *ptr = line;
+		char *cmd;
+
+		if (dump_only)
+			printf("%s\n", line);
+
+		cmd = strsep_skipspace(&ptr, "\t ");
+		if (cmd == NULL || cmd[0] == '#' || cmd[0] == '\0') {
+			free(line);
+			continue;
+		}
+
+		if (streq(cmd, "alias")) {
+			char *wildcard = strsep_skipspace(&ptr, "\t ");
+			char *realname = strsep_skipspace(&ptr, "\t ");
+			if (!wildcard || !realname)
+				goto syntax_error;
+			if (fnmatch(underscores(wildcard),name,0) == 0)
+				*aliases = add_alias(wildcard,
+						     underscores(realname),
+						     *aliases);
+		} else {
+syntax_error:
+			grammar(cmd, filename, linenum);
+		}
+
+		free(line);
+	}
+	fclose(cfile);
+	return 1;
 }
 
 static int parse_config_scan(const char *filename,
-			     const char *name,
 			     struct modprobe_conf *conf,
 			     int dump_only,
 			     int removing)
@@ -1078,7 +1131,7 @@ static int parse_config_scan(const char *filename,
 			char *cfgfile;
 
 			nofail_asprintf(&cfgfile, "%s/%s", filename, fe->name);
-			if (!parse_config_file(cfgfile, name, conf,
+			if (!parse_config_file(cfgfile, conf,
 					       dump_only, removing))
 				warn("Failed to open config file "
 				     "%s: %s\n", fe->name, strerror(errno));
@@ -1089,33 +1142,32 @@ static int parse_config_scan(const char *filename,
 
 		ret = 1;
 	} else {
-		if (parse_config_file(filename, name, conf, dump_only, removing))
+		if (parse_config_file(filename, conf, dump_only, removing))
 			ret = 1;
 	}
 	return ret;
 }
 
 static void parse_toplevel_config(const char *filename,
-				  const char *name,
 				  struct modprobe_conf *conf,
 				  int dump_only,
 				  int removing)
 {
 	if (filename) {
-		if (!parse_config_scan(filename, name, conf, dump_only, removing))
+		if (!parse_config_scan(filename, conf, dump_only, removing))
 			fatal("Failed to open config file %s: %s\n",
 			      filename, strerror(errno));
 		return;
 	}
 
 	/* deprecated config file */
-	if (parse_config_file("/etc/modprobe.conf", name, conf,
+	if (parse_config_file("/etc/modprobe.conf", conf,
 			      dump_only, removing) > 0)
 		warn("Deprecated config file /etc/modprobe.conf, "
 		      "all config files belong into /etc/modprobe.d/.\n");
 
 	/* default config */
-	parse_config_scan("/etc/modprobe.d", name, conf, dump_only, removing);
+	parse_config_scan("/etc/modprobe.d", conf, dump_only, removing);
 }
 
 /* Read possible module arguments from the kernel command line. */
@@ -1601,28 +1653,30 @@ int do_modprobe(const char *modulename,
 {
 	char *modname;
 	struct modprobe_conf conf = {};
-	struct module_alias *filtered_aliases;
+	struct module_alias *matching_aliases;
 	LIST_HEAD(list);
 	int failed = 0;
 
 	/* Convert name we are looking for */
 	modname = underscores(NOFAIL(strdup(modulename)));
 
-	/* Returns the resolved alias, options */
-	parse_toplevel_config(configname, modname, &conf, 0, flags & mit_remove);
+	/* Read aliases, options etc. */
+	parse_toplevel_config(configname, &conf, 0, flags & mit_remove);
 
 	/* Read module options from kernel command line */
 	parse_kcmdline(0, &conf.options);
 
+	matching_aliases = find_aliases(conf.aliases, modname);
+
 	/* No luck?  Try symbol names, if starts with symbol:. */
-	if (!conf.aliases && strstarts(modname, "symbol:")) {
+	if (!matching_aliases && strstarts(modname, "symbol:")) {
 		char *symfilename;
 
 		nofail_asprintf(&symfilename, "%s/modules.symbols", dirname);
-		read_aliases(symfilename, modname, 0, &conf.aliases);
+		read_aliases(symfilename, modname, 0, &matching_aliases);
 		free(symfilename);
 	}
-	if (!conf.aliases) {
+	if (!matching_aliases) {
 		if(!strchr(modname, ':'))
 			read_depends(dirname, modname, &list);
 
@@ -1633,14 +1687,13 @@ int do_modprobe(const char *modulename,
 		{
 			char *aliasfilename;
 
-
 			nofail_asprintf(&aliasfilename, "%s/modules.alias",
 					dirname);
 			read_aliases(aliasfilename, modname, 0,
-				     &conf.aliases);
+				     &matching_aliases);
 			free(aliasfilename);
 			/* builtin module? */
-			if (!conf.aliases && module_builtin(dirname, modname) > 0) {
+			if (!matching_aliases && module_builtin(dirname, modname) > 0) {
 				failed |= handle_builtin_module(modname, error,
 								flags);
 				goto out;
@@ -1648,17 +1701,17 @@ int do_modprobe(const char *modulename,
 		}
 	}
 
-	filtered_aliases = apply_blacklist(conf.aliases, conf.blacklist);
+	apply_blacklist(&matching_aliases, conf.blacklist);
 	if(flags & mit_resolve_alias) {
-		struct module_alias *aliases = filtered_aliases;
+		struct module_alias *aliases = matching_aliases;
 
 		for(; aliases; aliases=aliases->next)
 			printf("%s\n", aliases->module);
-		goto out_filtered_aliases;
+		goto out;
 	}
-	if (filtered_aliases) {
+	if (matching_aliases) {
 		errfn_t err = error;
-		struct module_alias *aliases = filtered_aliases;
+		struct module_alias *aliases = matching_aliases;
 
 		/* More than one alias?  Don't bail out on failure. */
 		if (aliases->next)
@@ -1682,16 +1735,15 @@ int do_modprobe(const char *modulename,
 	} else {
 		if (flags & mit_use_blacklist
 		    && find_blacklist(modname, conf.blacklist))
-			goto out_filtered_aliases;
+			goto out;
 
 		failed |= handle_module(modname, &list, newname, cmdline_opts,
 			conf.options, conf.softdeps, conf.commands, cmdline_opts,
 			configname, dirname, error, flags);
 	}
 
-out_filtered_aliases:
-	free_aliases(filtered_aliases);
 out:
+	free_aliases(matching_aliases);
 	free(modname);
 	return failed;
 }
@@ -1864,7 +1916,7 @@ int main(int argc, char *argv[])
 		nofail_asprintf(&aliasfilename, "%s/modules.alias", dirname);
 		nofail_asprintf(&symfilename, "%s/modules.symbols", dirname);
 
-		parse_toplevel_config(configname, "", &conf, 1, 0);
+		parse_toplevel_config(configname, &conf, 1, 0);
 		/* Read module options from kernel command line */
 		parse_kcmdline(1, &conf.options);
 		read_aliases(aliasfilename, "", 1, &conf.aliases);
