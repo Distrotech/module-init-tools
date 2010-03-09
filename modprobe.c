@@ -548,15 +548,17 @@ static char *prepend_option(char *options, const char *newoption)
 
 /* Add to options */
 static char *add_extra_options(const char *modname,
-			       char *optstring,
+			       const char *optstring,
 			       const struct module_options *options)
 {
+	char *opts = NOFAIL(strdup(optstring));
+
 	while (options) {
 		if (streq(options->modulename, modname))
-			optstring = prepend_option(optstring, options->options);
+			opts = prepend_option(opts, options->options);
 		options = options->next;
 	}
-	return optstring;
+	return opts;
 }
 
 /* Is module in /proc/modules?  If so, fill in usecount if not NULL.
@@ -1240,6 +1242,7 @@ static void do_command(const char *modname,
 	free(replaced_cmd);
 }
 
+<<<<<<< HEAD
 /* Forward declaration */
 int do_modprobe(const char *modname,
 		const char *newname,
@@ -1300,8 +1303,11 @@ static void do_softdep(const struct module_softdep *softdep,
 }
 
 /* Actually do the insert.  Frees second arg. */
+=======
+/* Actually do the insert. */
+>>>>>>> 09e4ce22b5751918ea1c8bd11ee36a10bcc21c54
 static int insmod(struct list_head *list,
-		   char *optstring,
+		   const char *optstring,
 		   const char *newname,
 		   const struct module_options *options,
 		   const struct module_softdep *softdeps,
@@ -1319,6 +1325,7 @@ static int insmod(struct list_head *list,
 	struct module *mod = list_entry(list->next, struct module, list);
 	int rc = 0;
 	int already_loaded;
+	char *opts = NULL;
 
 	/* Take us off the list. */
 	list_del(&mod->list);
@@ -1328,14 +1335,19 @@ static int insmod(struct list_head *list,
 		modprobe_flags_t f = flags;
 		f &= ~mit_first_time;
 		f &= ~mit_ignore_commands;
+<<<<<<< HEAD
 		if ((rc = insmod(list, NOFAIL(strdup("")), NULL,
 		       options, softdeps, commands, "",
 		       configname, dirname, warn, f)) != 0)
 		{
+=======
+		if ((rc = insmod(list, "", NULL,
+		       options, commands, "", warn, f)) != 0) {
+>>>>>>> 09e4ce22b5751918ea1c8bd11ee36a10bcc21c54
 			error("Error inserting %s (%s): %s\n",
 				mod->modname, mod->filename,
 				insert_moderror(errno));
-			goto out_optstring;
+			goto out;
 		}
 	}
 
@@ -1343,7 +1355,7 @@ static int insmod(struct list_head *list,
 	if (fd < 0) {
 		error("Could not open '%s': %s\n",
 		      mod->filename, strerror(errno));
-		goto out_optstring;
+		goto out;
 	}
 
 	/* Don't do ANYTHING if already in kernel. */
@@ -1376,7 +1388,7 @@ static int insmod(struct list_head *list,
 			close_file(fd);
 			do_command(mod->modname, command, flags & mit_dry_run,
 				   error, "install", cmdline_opts);
-			goto out_optstring;
+			goto out;
 		}
 	}
 
@@ -1395,14 +1407,14 @@ static int insmod(struct list_head *list,
 		clear_magic(module);
 
 	/* Config file might have given more options */
-	optstring = add_extra_options(mod->modname, optstring, options);
+	opts = add_extra_options(mod->modname, optstring, options);
 
-	info("insmod %s %s\n", mod->filename, optstring);
+	info("insmod %s %s\n", mod->filename, opts);
 
 	if (flags & mit_dry_run)
-		goto out;
+		goto out_elf_file;
 
-	ret = init_module(module->data, module->len, optstring);
+	ret = init_module(module->data, module->len, opts);
 	if (ret != 0) {
 		if (errno == EEXIST) {
 			if (flags & mit_first_time)
@@ -1418,12 +1430,12 @@ static int insmod(struct list_head *list,
 			      insert_moderror(errno));
 		rc = 1;
 	}
- out:
+ out_elf_file:
 	release_elf_file(module);
  out_unlock:
 	close_file(fd);
- out_optstring:
-	free(optstring);
+	free(opts);
+ out:
 	return rc;
 }
 
@@ -1559,7 +1571,7 @@ static int handle_module(const char *modname,
 		rmmod(todo_list, newname, softdeps, commands, cmdline_opts,
 		      configname, dirname, error, flags);
 	else
-		insmod(todo_list, NOFAIL(strdup(options)), newname,
+		insmod(todo_list, options, newname,
 		       modoptions, softdeps, commands, cmdline_opts,
 		       configname, dirname, error, flags);
 
@@ -1656,8 +1668,14 @@ int do_modprobe(const char *modulename,
 			err = warn;
 		while (aliases) {
 			/* Add the options for this alias. */
+<<<<<<< HEAD
 			char *opts = NOFAIL(strdup(cmdline_opts));
 			opts = add_extra_options(modname, opts, conf.options);
+=======
+			char *opts;
+			opts = add_extra_options(modname,
+						 cmdline_opts, modoptions);
+>>>>>>> 09e4ce22b5751918ea1c8bd11ee36a10bcc21c54
 
 			read_depends(dirname, aliases->module, &list);
 			failed |= handle_module(aliases->module,
@@ -1666,6 +1684,7 @@ int do_modprobe(const char *modulename,
 				configname, dirname, err, flags);
 
 			aliases = aliases->next;
+			free(opts);
 			INIT_LIST_HEAD(&list);
 		}
 	} else {
