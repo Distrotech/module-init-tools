@@ -380,7 +380,7 @@ static void print_usage(const char *name)
 	"\t-P, --symbol-prefix  Architecture symbol prefix\n"
 	"\t-V, --version        Print the release version\n"
 	"\t-v, --verbose        Enable verbose mode\n"
-	"\t-w, --warn		Warn on duplicates\n"
+	"\t-w, --warn           Warn on duplicates\n"
 	"\t-h, --help           Print this usage message\n"
 	"\n"
 	"The following options are useful for people managing distributions:\n"
