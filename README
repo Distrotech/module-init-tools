@@ -1,6 +1,12 @@
 module-init-tools - Linux userspace module loading utilities
 ------------------------------------------------------------
 
+NOTE: module-init-tools is due to be replaced with a new utility, which will
+      be based upon the "libkmod" (kmod) codebase, unified with this one. To
+      join in the fun, see #kmod on Freenode, and the mailing list. Consider
+      progress of this new project before embarking on new development here.
+      Once the replacement is ready, the existing codebase will be obsolete.
+
 Handy Resources:
 	- Bugs: Please send email to list
 	- Git:  git://git.kernel.org/pub/scm/utils/kernel/module-init-tools/module-init-tools.git
