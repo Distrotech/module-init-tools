@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset='utf-8'>
+    <meta http-equiv="X-UA-Compatible" content="chrome=1">
+    <link href='https://fonts.googleapis.com/css?family=Chivo:900' rel='stylesheet' type='text/css'>
+    <link rel="stylesheet" type="text/css" href="stylesheets/stylesheet.css" media="screen" />
+    <link rel="stylesheet" type="text/css" href="stylesheets/pygment_trac.css" media="screen" />
+    <link rel="stylesheet" type="text/css" href="stylesheets/print.css" media="print" />
+    <!--[if lt IE 9]>
+    <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+    <title>Module-init-tools by Distrotech</title>
+  </head>
+
+  <body>
+    <div id="container">
+      <div class="inner">
+
+        <header>
+          <h1>Module-init-tools</h1>
+          <h2>Mirror of git://git.kernel.org/pub/scm/utils/kernel/module-init-tools/module-init-tools.git</h2>
+        </header>
+
+        <section id="downloads" class="clearfix">
+          <a href="https://github.com/Distrotech/module-init-tools/zipball/master" id="download-zip" class="button"><span>Download .zip</span></a>
+          <a href="https://github.com/Distrotech/module-init-tools/tarball/master" id="download-tar-gz" class="button"><span>Download .tar.gz</span></a>
+          <a href="https://github.com/Distrotech/module-init-tools" id="view-on-github" class="button"><span>View on GitHub</span></a>
+        </section>
+
+        <hr>
+
+        <section id="main_content">
+          <h2>
+<a name="module-init-tools---linux-userspace-module-loading-utilities" class="anchor" href="#module-init-tools---linux-userspace-module-loading-utilities"><span class="octicon octicon-link"></span></a>module-init-tools - Linux userspace module loading utilities</h2>
+
+<p>NOTE: module-init-tools is due to be replaced with a new utility, which will
+      be based upon the "libkmod" (kmod) codebase, unified with this one. To
+      join in the fun, see #kmod on Freenode, and the mailing list. Consider
+      progress of this new project before embarking on new development here.
+      Once the replacement is ready, the existing codebase will be obsolete.</p>
+
+<p>Handy Resources:
+    - Bugs: Please send email to list
+    - Git:  git://git.kernel.org/pub/scm/utils/kernel/module-init-tools/module-init-tools.git
+    - IRC:  irc.freenode.org/#module-init-tools
+    - Mail: <a href="mailto:linux-modules@vger.kernel.org">linux-modules@vger.kernel.org</a>
+    - Web:  <a href="http://modules.wiki.kernel.org/">http://modules.wiki.kernel.org/</a></p>
+
+<p>The module-init-tools are used by modern 2.6 series Linux systems to provide
+userspace-side assistance in loading kernel modules and their dependencies.
+Originally written to replace the older "modutils", the utilities include
+the "modprobe" (load modules and their dependencies), "insmod" (load just
+a single module), "modinfo" (retrieve module information), and other related
+module management commands. These are intended to be relatively lightweight
+in their design, since 2.6 series kernels do much of the work internally.</p>
+
+<p>You will find documentation within the man pages and in this README file,
+as well as some hints on development within the HACKING file. You are
+encouraged to get involved by signing up to the <a href="mailto:linux-modules@vger.kernel.org">linux-modules@vger.kernel.org</a>
+project mailing list, and posting patches (git pull requests are welcome).
+You can also find further information, including the address of the mailing
+list, this git repository, and so forth on the module-init-tools wiki.</p>
+
+<p>Development takes place against the latest upstream Linux kernels (2.6.33
+as of this writing, though kernel development moves quickly). Backward
+compatibility is generally attempted, but forward compatibility (i.e. the
+ability for a specific release of module-init-tools to work against data
+files created by a later version as yet unreleased version) is not. In
+particular, the generated data files within /lib/modules/
+must not be assumed to have any particular format, nor should they be
+parsed be any other tools. There is a specific "modinfo" utility intended
+for the purposes of providing the information stored within those files.</p>
+
+<p>Recent Changes:
+    - There is no backwards compatibility for pre-2.6 series kernels. If
+      you intend to use an older kernel (wherein the module utilities
+      must perform various linking stages in userspace), use an older
+      tool such as provided in the "modutils" legacy kernel package.</p>
+
+<pre><code>- Explicit locking of kernel modules is no longer being performed at
+  load time (the existing implementation required a writeable mount
+  in /lib/modules that is by no means assured - an alternative of
+  using SYSV locks was experimented with but deemed unnecessary).
+  The kernel will handle one modprobe instance racing with another
+  by denying the load and returning an error message.
+</code></pre>
+
+<p>Work in progress:
+    - We are working on soft-dependency support that will allow modules
+      to provide hints as to dependencies that may not be explicit.</p>
+
+<p>Requirements:
+    - A 2.6 series Linux kernel with sysfs, procfs, and loadable module
+      support enabled in the kernel configuration. It is also required
+      that sysfs and procfs be mounted in their usual /proc and /sys
+      locations in order for certain functionality to be provided.</p>
+
+<pre><code>- Module remove support must be enabled if removing is required. Yo
+  can also enable other options such as forced removal, but this is
+  really a bad idea for anything other than development.
+
+- Module versioning (MODVERSIONS) must be enabled if you would
+  like to try to use modules from one kernel with another, similar
+  one without the kernel complaining loudly at the difference.
+</code></pre>
+
+<p>Quickstart:
+    - Make sure you have appropriate development tools (gcc, GNU autotools,
+      docbook2man, etc. Some distributions may require optional packages
+      for a static version of glibc, as an example).</p>
+
+<pre><code>- To begin hacking on module-init-tools, you can do the following:
+
+1). aclocal -I m4 &amp;&amp; automake --add-missing --copy &amp;&amp; autoconf
+    (or run "autoreconf" from an existing setup)
+2). ./configure
+    (optionally specify "--prefix" or "--mandir" for non /usr/local)
+3). make
+4). make install
+5). depmod
+    (to update /lib/modules/&lt;kernel version&gt; for the latest release)
+</code></pre>
+
+<p>Please direct any comment/question to the linux-modules mailing list at:
+    <a href="mailto:linux-modules@vger.kernel.org">linux-modules@vger.kernel.org</a></p>
+        </section>
+
+        <footer>
+          Module-init-tools is maintained by <a href="https://github.com/Distrotech">Distrotech</a><br>
+          This page was generated by <a href="http://pages.github.com">GitHub Pages</a>. Tactile theme by <a href="http://twitter.com/jasonlong">Jason Long</a>.
+        </footer>
+
+        
+      </div>
+    </div>
+  </body>
+</html>
