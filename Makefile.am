@@ -36,17 +36,17 @@ depmod_LDADD = $(LDADD) libmodtools.a
 modinfo_LDADD = $(LDADD) libmodtools.a
 modindex_LDADD = $(LDADD) libmodtools.a
 
-MAN5 = depmod.conf.5 depmod.d.5 modprobe.conf.5 modprobe.d.5 \
-	modules.dep.5 modules.dep.bin.5
-MAN8 = depmod.8 insmod.8 lsmod.8 rmmod.8 modprobe.8 modinfo.8
-SGML = $(addprefix doc/,  $(MAN5:%.5=%.sgml) $(MAN8:%.8=%.sgml))
+#MAN5 = depmod.conf.5 depmod.d.5 modprobe.conf.5 modprobe.d.5 \
+#	modules.dep.5 modules.dep.bin.5
+#MAN8 = depmod.8 insmod.8 lsmod.8 rmmod.8 modprobe.8 modinfo.8
+#SGML = $(addprefix doc/,  $(MAN5:%.5=%.sgml) $(MAN8:%.8=%.sgml))
 dist_man_MANS = $(MAN5) $(MAN8)
 # If they haven't overridden mandir, fix it (never /man!)
 mandir =$(shell if [ @mandir@ = $(prefix)/man ]; then if [ $(prefix) = / ]; then echo /usr/share/man; else echo $(prefix)/share/man; fi; else echo @mandir@; fi)
 
 TESTSUITE := $(shell test -e @srcdir@/tests && find @srcdir@/tests -type f ! -name '*~')
 
-EXTRA_DIST = generate-modprobe.conf FAQ CODING stress_modules.sh install-with-care $(SGML) $(man_MANS) $(TESTSUITE)
+EXTRA_DIST = generate-modprobe.conf FAQ CODING stress_modules.sh install-with-care $(man_MANS) $(TESTSUITE)
 
 sbin_PROGRAMS = insmod modprobe rmmod depmod modinfo
 if BUILD_STATIC_UTILS
